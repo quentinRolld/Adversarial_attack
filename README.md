@@ -7,4 +7,4 @@ Cet article propose une approche afin d'expliquer l'origine de l'effet de ces at
 
 ## Répartition des tâches
 
-*** 1 fast gradient sign method ***
+***1 fast gradient sign method ***
