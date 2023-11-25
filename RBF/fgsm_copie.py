@@ -12,7 +12,13 @@ import torchvision.datasets as dsets
 import torch.utils.data as Data
 
 
-""" Here is the function that will compute the adversarial examples """
+""" Here is the function that will compute the adversarial examples
+arguments :
+    - model : the model to test
+    - image : the image to alter
+    - epsilon : the value of epsilon for the adversarial attack
+    - loss : the loss function to use
+    - labels : the labels of the image """
 
 def adv_attack(model, image, epsilon, loss, labels):
 
@@ -39,7 +45,12 @@ def adv_attack(model, image, epsilon, loss, labels):
 
 
 """ This is the test function that will apply the adversarial attack 
-on a model and return the accuracy, confidence and altered image """
+on a model and return the accuracy, confidence and altered image
+arguments :
+    - model : the model to test
+    - device : the device on which the model is
+    - normal_loader : the loader of the normal images
+    - epsilon : the value of epsilon for the adversarial attack """
 
 def test( model, device, normal_loader, epsilon ):
 
