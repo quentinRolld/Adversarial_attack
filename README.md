@@ -8,7 +8,7 @@ Cet article propose une approche afin d'expliquer l'origine de l'effet de ces at
 ## Répartition des tâches
 
 * 1 - Fast gradient sign method : Tout le groupe
-* 2 - Modèle de régression logistique appliqué sur des exemples modifiés par adversalrial attaques : Loris
+* 2 - Modèle de régression logistique appliqué sur des exemples modifiés par adversarial attaques : Loris
 * 3 - Adversarial training = exemple contre classifieur et régularisation : Florent
 * 4 - RBF network vs adversarial : Quentin
 * 5 - Expliquer comment l'attaque adversarial se généralise à plusieurs modèles : AL
