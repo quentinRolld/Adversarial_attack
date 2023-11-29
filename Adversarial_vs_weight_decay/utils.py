@@ -35,6 +35,8 @@ def extract_from_mnist():
 
 def visualize_data(num_rows,num_cols,filtered_data):
 
+    num_rows = 10
+    num_cols = 10
     cmap = LinearSegmentedColormap.from_list('custom_gray', [(0.5, 0.5, 0.5), (1, 1, 1)], N=256)
 
     # Create a figure with subplots and set the face color to gray
