@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from sklearn.datasets import fetch_openml
 import torch
@@ -9,31 +10,32 @@ from sklearn.model_selection import train_test_split
 from matplotlib.colors import LinearSegmentedColormap
 from sklearn.preprocessing import LabelEncoder
 
-
 def prep_data(filtered_data):
 
-    X = filtered_data.iloc[:, :-1].values
+    label_mapping = {3: 0, 7: 1}
+
+    # Assuming y is your target labels
     y = filtered_data['target'].values
-
-    # Split the data into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    # Assuming y_train is your target labels
+    y_train_mapped = [label_mapping[label] for label in y]
     label_encoder = LabelEncoder()
-    y_train_encoded = label_encoder.fit_transform(y_train)
+    label_encoder.classes_ = np.array([3, 7])
+    y_train_encoded = label_encoder.transform(y)
+
+    filtered_data_normalized = filtered_data.iloc[:, :-1].values / 255.0
+
 
     # Convert data to PyTorch tensors
-    X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
-    y_train_tensor = torch.tensor(y_train_encoded, dtype=torch.long)
+    X_tensor = torch.tensor(filtered_data_normalized, dtype=torch.float32)
+    y_tensor = torch.tensor(y_train_encoded, dtype=torch.long)
 
-    X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
-    y_test_tensor = torch.tensor(y_test, dtype=torch.long)
+    # Split the data into training and testing sets
+    X_train_tensor, X_test_tensor, y_train_tensor, y_test_tensor = train_test_split(X_tensor, y_tensor, test_size=0.2, random_state=42)
+    num_classes = len(set(y))
+    print("Unique classes in target labels:", num_classes)
+    return X_train_tensor,y_train_tensor,X_test_tensor,y_test_tensor,num_classes
 
-    print("Unique classes in target labels:", set(y_train))
-    return X_train,y_train,X_train_tensor,y_train_tensor,X_test_tensor,y_test_tensor
 
-
-def create_model(X_train,y_train):
+def create_model(X_train_tensor,num_classes,lr):
     class LogisticRegressionModel(nn.Module):
         def __init__(self, input_size, num_classes):
             super(LogisticRegressionModel, self).__init__()
@@ -41,50 +43,95 @@ def create_model(X_train,y_train):
 
         def forward(self, x):
             return self.linear(x)
-
     # Specify input size and dynamically set the number of classes
-    input_size = X_train.shape[1]
-    num_classes = len(set(y_train))
+    input_size = X_train_tensor.shape[1]
 
     # Instantiate the model
     model = LogisticRegressionModel(input_size, num_classes)
 
     # Define loss function and optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=0.01)
+    optimizer = optim.SGD(model.parameters(), lr)
     return model,criterion,optimizer
 
-def training_loop(optimizer, model, criterion, X_train_tensor, y_train_tensor,num_epochs=200,batch_size=128):
-
-    # Convert data to DataLoader for batching
+def training_loop(optimizer, model, criterion, X_train_tensor, y_train_tensor, num_epochs=200, batch_size=128):
     train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
     train_loader = DataLoader(train_dataset, batch_size, shuffle=True)
 
-    # Training loop
+    train_losses = []  # Store training losses for each epoch
+
     for epoch in range(num_epochs):
         for batch_X, batch_y in train_loader:
-            # Forward pass
             outputs = model(batch_X)
             loss = criterion(outputs, batch_y)
 
-            # Backward pass and optimization
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-        # Print the loss after each epoch
+        train_losses.append(loss.item())  # Store the loss after each epoch
         print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}')
-    return model
+
+    return train_losses,model
 
 
-def map_values(predicted_tensor):
-    # Define your mapping here
-    mapping = {0: 3, 1: 7}
+def plot_losses(train_losses):
+    import matplotlib.pyplot as plt
+    plt.plot(train_losses, label='Training Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training Curve')
+    plt.legend()
+    plt.show()
 
-    # Apply the mapping to the predicted tensor
-    mapped_tensor = torch.tensor([mapping[val.item()] for val in predicted_tensor])
+def eval_train(X_train_tensor,y_train_tensor,model):
 
-    return mapped_tensor
+    model.eval()  # Set the model to evaluation mode
+    with torch.no_grad():
+        train_outputs = model(X_train_tensor)
+        _, predicted = torch.max(train_outputs, 1)
+        correct = (predicted == y_train_tensor).sum().item()
+        total = y_train_tensor.size(0)
+        train_accuracy = correct / total
+
+    print(f'Training Accuracy: {train_accuracy * 100:.2f}%')
+
+
+def visualize_weights_and_signs(model):
+    # Get the weights from the first layer (assuming it's the layer you're interested in)
+    weights = model.linear.weight.data
+
+    # Extract the signs of the weights
+    weight_signs = torch.sign(weights)
+
+    # Check if the weights are 1-dimensional
+    if weights.dim() == 1:
+        # Reshape the weights to be a 2D tensor with one row
+        weights = weights.view(1, -1)
+
+    # Reshape the weights to match the original image dimensions (assuming 28x28)
+    weight_images = weights.view(-1, 28, 28)
+
+    # Reshape the weight signs to match the original image dimensions (assuming 28x28)
+    weight_sign_images = weight_signs.view(-1, 28, 28)
+
+    # Plot each set of weights and weight signs in a separate subplot
+    num_classes = weight_images.size(0)
+    fig, axes = plt.subplots(num_classes, 2, figsize=(16, 8 * num_classes))
+
+    for i in range(num_classes):
+        # Plot weights
+        axes[i, 0].imshow(weight_images[i].cpu().numpy(), cmap='gray')
+        axes[i, 0].set_title(f'Class {i} - Weight')
+        axes[i, 0].axis('off')
+
+        # Plot weight signs
+        axes[i, 1].imshow(weight_sign_images[i].cpu().numpy(), cmap='gray', vmin=-1, vmax=1)
+        axes[i, 1].set_title(f'Class {i} - Sign')
+        axes[i, 1].axis('off')
+
+    # Show the plot
+    plt.show()
 
 def eval_test(X_test_tensor,y_test_tensor,model):
     # Convert test data to DataLoader for batching
@@ -100,7 +147,6 @@ def eval_test(X_test_tensor,y_test_tensor,model):
         for batch_X, batch_y in test_loader:
             outputs = model(batch_X)
             _, predicted = torch.max(outputs.data, 1)
-            predicted = map_values(predicted)
             total += batch_y.size(0)
             correct += (predicted == batch_y).sum().item()
 
