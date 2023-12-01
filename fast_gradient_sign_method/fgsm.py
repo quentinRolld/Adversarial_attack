@@ -83,7 +83,13 @@ def test( model, device, normal_loader, epsilon):
 
         # Check for success
         final_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
-        if final_pred.item() == labels.item():
+        print("Taille de final_pred :", final_pred.size())
+        print("Taille de labels :", labels.size())
+        #print(final_pred.item())
+
+        correct += final_pred.eq(labels.view_as(final_pred)).sum().item()
+
+        """ if final_pred.item() == (labels.unsqueeze(1)).item():
             correct += 1
             # Special case for saving 0 epsilon examples
             if epsilon == 0 and len(adv_examples) < 5:
@@ -93,7 +99,7 @@ def test( model, device, normal_loader, epsilon):
             # Save some adv examples for visualization later
             if len(adv_examples) < 5:
                 adv_ex = altered_data.squeeze().detach().cpu().numpy()
-                adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) )
+                adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) ) """
         
         probabilities = nn.functional.softmax(output, dim=1)
         confidence, predictions = torch.max(probabilities, dim=1)
