@@ -1,4 +1,7 @@
 
+# inspired from : https://pytorch.org/tutorials/beginner/fgsm_tutorial.html
+
+
 import torch
 import torch.nn as nn
 import numpy as np
@@ -12,9 +15,17 @@ import torchvision.datasets as dsets
 import torch.utils.data as Data
 
 
-""" Here is the function that will compute the adversarial examples """
+""" Here is the function that will compute the adversarial examples
+arguments :
+    - model : the model to test
+    - image : the image to alter
+    - epsilon : the value of epsilon for the adversarial attack
+    - loss : the loss function to use
+    - labels : the labels of the image """
 
-def adv_attack(model, image, epsilon, loss, labels):
+def adv_attack(model, device, image, epsilon, labels):
+
+    loss = nn.CrossEntropyLoss()
 
     # Move the model to the CPU
     image = image.to(device) # Move to CPU
@@ -38,10 +49,17 @@ def adv_attack(model, image, epsilon, loss, labels):
 
 
 
-""" This is the test function that will apply the adversarial attack 
-on a model and return the accuracy, confidence and altered image """
 
-def test( model, device, normal_loader, epsilon ):
+""" This is the test function that will apply the adversarial attack 
+on a model and return the accuracy, confidence and altered image
+arguments :
+    - model : the model to test
+    - device : the device on which the model is
+    - normal_loader : the loader of the normal images
+    - epsilon : the value of epsilon for the adversarial attack """
+
+
+def test( model, device, normal_loader, epsilon):
 
     # Accuracy counter
     correct = 0
@@ -54,8 +72,11 @@ def test( model, device, normal_loader, epsilon ):
         output = model(image)
         init_pred = output.max(1, keepdim=True)[1]
 
+        # Loss calculation
+        loss = F.nll_loss(output, labels)
+
         # Call FGSM Attack
-        altered_data = adv_attack(model, image, epsilon, loss, labels).to(device)
+        altered_data = adv_attack(model, device, image, epsilon, labels).to(device)
 
         # Re-classify the perturbed image
         output = model(altered_data)

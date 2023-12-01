@@ -1,4 +1,7 @@
 
+# inspired from : https://pytorch.org/tutorials/beginner/fgsm_tutorial.html
+
+
 import torch
 import torch.nn as nn
 import numpy as np
@@ -20,7 +23,9 @@ arguments :
     - loss : the loss function to use
     - labels : the labels of the image """
 
-def adv_attack(model, image, epsilon, loss, labels):
+def adv_attack(model, device, image, epsilon, labels):
+
+    loss = nn.CrossEntropyLoss()
 
     # Move the model to the CPU
     image = image.to(device) # Move to CPU
@@ -52,7 +57,7 @@ arguments :
     - normal_loader : the loader of the normal images
     - epsilon : the value of epsilon for the adversarial attack """
 
-def test( model, device, normal_loader, epsilon ):
+def test( model, device, normal_loader, epsilon):
 
     # Accuracy counter
     correct = 0
@@ -65,15 +70,24 @@ def test( model, device, normal_loader, epsilon ):
         output = model(image)
         init_pred = output.max(1, keepdim=True)[1]
 
+        # Loss calculation
+        loss = F.nll_loss(output, labels)
+
         # Call FGSM Attack
-        altered_data = adv_attack(model, image, epsilon, loss, labels).to(device)
+        altered_data = adv_attack(model, device, image, epsilon, labels).to(device)
 
         # Re-classify the perturbed image
         output = model(altered_data)
 
         # Check for success
         final_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
-        if final_pred.item() == labels.item():
+        print("Taille de final_pred :", final_pred.size())
+        print("Taille de labels :", labels.size())
+        #print(final_pred.item())
+
+        correct += final_pred.eq(labels.view_as(final_pred)).sum().item()
+
+        """ if final_pred.item() == (labels.unsqueeze(1)).item():
             correct += 1
             # Special case for saving 0 epsilon examples
             if epsilon == 0 and len(adv_examples) < 5:
@@ -83,7 +97,7 @@ def test( model, device, normal_loader, epsilon ):
             # Save some adv examples for visualization later
             if len(adv_examples) < 5:
                 adv_ex = altered_data.squeeze().detach().cpu().numpy()
-                adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) )
+                adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) ) """
         
         probabilities = nn.functional.softmax(output, dim=1)
         confidence, predictions = torch.max(probabilities, dim=1)
