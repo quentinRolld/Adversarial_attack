@@ -57,7 +57,7 @@ arguments :
     - normal_loader : the loader of the normal images
     - epsilon : the value of epsilon for the adversarial attack """
 
-def test( model, device, normal_loader, epsilon):
+def test_adv( model, device, normal_loader, epsilon):
 
     # Accuracy counter
     correct = 0
@@ -78,6 +78,50 @@ def test( model, device, normal_loader, epsilon):
 
         # Re-classify the perturbed image
         output = model(altered_data)
+
+        # Check for success
+        final_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
+        print("Taille de final_pred :", final_pred.size())
+        print("Taille de labels :", labels.size())
+        #print(final_pred.item())
+
+        #correct += final_pred.eq(labels.view_as(final_pred)).sum().item()
+
+        if final_pred.item() == labels.item():
+            correct += 1
+            # Special case for saving 0 epsilon examples
+            if epsilon == 0 and len(adv_examples) < 5:
+                adv_ex = altered_data.squeeze().detach().cpu().numpy()
+                adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) )
+        else:
+            # Save some adv examples for visualization later
+            if len(adv_examples) < 5:
+                adv_ex = altered_data.squeeze().detach().cpu().numpy()
+                adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) )
+        
+        probabilities = nn.functional.softmax(output, dim=1)
+        confidence, predictions = torch.max(probabilities, dim=1)
+
+    # Calculate final accuracy for this epsilon
+    final_acc = correct/float(len(normal_loader))
+    print(f"Epsilon: {epsilon}\tTest Accuracy = {correct} / {len(normal_loader)} = {final_acc}")
+
+    # Return the accuracy and an adversarial example
+    return final_acc, adv_examples, confidence
+
+
+def test_normal( model, device, normal_loader, epsilon):
+
+    # Accuracy counter
+    correct = 0
+    adv_examples = []
+
+    # Loop over all examples in test set
+    for image, labels in normal_loader:
+
+        image, labels = image.to(device), labels.to(device)
+        output = model(image)
+        init_pred = output.max(1, keepdim=True)[1]
 
         # Check for success
         final_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
