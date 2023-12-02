@@ -8,6 +8,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
 from matplotlib.colors import LinearSegmentedColormap
+import numpy as np
 
 
 def extract_from_mnist():
@@ -49,15 +50,22 @@ def visualize_data(num_rows,num_cols,filtered_data):
         row_index = i // num_cols
         col_index = i % num_cols
         
+
         if i < len(filtered_data):
-            # Reshape the image data to 28x28 pixels
-            image = filtered_data.iloc[i, :-1].values.reshape(28, 28)
-            
+
+            if isinstance(filtered_data, pd.DataFrame):
+                # Use iloc for DataFrame
+                image = filtered_data.iloc[i, :-1].values.reshape(28, 28)
+            elif isinstance(filtered_data, np.ndarray):
+                # Use [i] for NumPy array
+                image = filtered_data[i].reshape(28, 28)
+            else:
+                print("Unsupported data type")
             # Plot the image with the custom gray background
-            ax.imshow(image, cmap=cmap, vmin=0, vmax=255)
+            ax.imshow(image, cmap=cmap, vmin=0, vmax=1)
             ax.axis('off')
-            
-            
+        
+        
 
     # Adjust the spacing between subplots
     plt.tight_layout()
