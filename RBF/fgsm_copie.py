@@ -54,7 +54,7 @@ on a model and return the accuracy, confidence and altered image
 arguments :
     - model : the model to test
     - device : the device on which the model is
-    - normal_loader : the loader of the normal images
+    - normal_loader : the loader of the normal images --> test loader
     - epsilon : the value of epsilon for the adversarial attack """
 
 def test_adv( model, device, normal_loader, epsilon):
@@ -76,13 +76,13 @@ def test_adv( model, device, normal_loader, epsilon):
         # Call FGSM Attack
         altered_data = adv_attack(model, device, image, epsilon, labels).to(device)
 
-        # Re-classify the perturbed image
+        # Re-classify the perturbed image using the new images wihch are now altered
         output = model(altered_data)
 
         # Check for success
-        final_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
-        print("Taille de final_pred :", final_pred.size())
-        print("Taille de labels :", labels.size())
+        final_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability --> argmax
+        #print("Taille de final_pred :", final_pred.size())
+        #print("Taille de labels :", labels.size())
         #print(final_pred.item())
 
         #correct += final_pred.eq(labels.view_as(final_pred)).sum().item()
