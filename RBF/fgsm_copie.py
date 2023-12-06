@@ -57,7 +57,7 @@ arguments :
     - normal_loader : the loader of the normal images --> test loader
     - epsilon : the value of epsilon for the adversarial attack """
 
-def test_adv( model, device, normal_loader, epsilon):
+def test( model, device, normal_loader, epsilon):
 
     # Accuracy counter
     correct = 0
@@ -68,10 +68,6 @@ def test_adv( model, device, normal_loader, epsilon):
 
         image, labels = image.to(device), labels.to(device)
         output = model(image)
-        init_pred = output.max(1, keepdim=True)[1]
-
-        # Loss calculation
-        loss = F.nll_loss(output, labels)
 
         # Call FGSM Attack
         altered_data = adv_attack(model, device, image, epsilon, labels).to(device)
@@ -81,70 +77,21 @@ def test_adv( model, device, normal_loader, epsilon):
 
         # Check for success
         final_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability --> argmax
-        #print("Taille de final_pred :", final_pred.size())
-        #print("Taille de labels :", labels.size())
-        #print(final_pred.item())
+        _, predicted = torch.max(output, 1)
 
         #correct += final_pred.eq(labels.view_as(final_pred)).sum().item()
 
-        if final_pred.item() == labels.item():
-            correct += 1
-            # Special case for saving 0 epsilon examples
-            if epsilon == 0 and len(adv_examples) < 5:
-                adv_ex = altered_data.squeeze().detach().cpu().numpy()
-                adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) )
-        else:
-            # Save some adv examples for visualization later
-            if len(adv_examples) < 5:
-                adv_ex = altered_data.squeeze().detach().cpu().numpy()
-                adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) )
+        """ if final_pred.item() == labels.item():
+            correct += 1 """
         
+        correct = (final_pred == labels).sum().item()
+
         probabilities = nn.functional.softmax(output, dim=1)
-        confidence, predictions = torch.max(probabilities, dim=1)
-
-    # Calculate final accuracy for this epsilon
-    final_acc = correct/float(len(normal_loader))
-    print(f"Epsilon: {epsilon}\tTest Accuracy = {correct} / {len(normal_loader)} = {final_acc}")
-
-    # Return the accuracy and an adversarial example
-    return final_acc, adv_examples, confidence
-
-
-def test_normal( model, device, normal_loader, epsilon):
-
-    # Accuracy counter
-    correct = 0
-    adv_examples = []
-
-    # Loop over all examples in test set
-    for image, labels in normal_loader:
-
-        image, labels = image.to(device), labels.to(device)
-        output = model(image)
-        init_pred = output.max(1, keepdim=True)[1]
-
-        # Check for success
-        final_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
-        print("Taille de final_pred :", final_pred.size())
-        print("Taille de labels :", labels.size())
-        #print(final_pred.item())
-
-        correct += final_pred.eq(labels.view_as(final_pred)).sum().item()
-
-        """ if final_pred.item() == (labels.unsqueeze(1)).item():
-            correct += 1
-            # Special case for saving 0 epsilon examples
-            if epsilon == 0 and len(adv_examples) < 5:
-                adv_ex = altered_data.squeeze().detach().cpu().numpy()
-                adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) )
-        else:
-            # Save some adv examples for visualization later
-            if len(adv_examples) < 5:
-                adv_ex = altered_data.squeeze().detach().cpu().numpy()
-                adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) ) """
+        confidence, predictions = torch.max(probabilities, dim=1) # est-ce que c'est bien le max qu'il faut prendre ?
+                                                                  # le max de la sortie de la fonction softmax ?
+                                                                  # pour trouver la confiance et la prediction
         
-        probabilities = nn.functional.softmax(output, dim=1)
-        confidence, predictions = torch.max(probabilities, dim=1)
+        print(probabilities)
 
     # Calculate final accuracy for this epsilon
     final_acc = correct/float(len(normal_loader))
