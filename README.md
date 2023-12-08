@@ -1,14 +1,24 @@
-# Adversarial_attack
+# Adversarial_attack partie 5
 
-Voici le dépôt github de notre projet de MLA. 
-Nous avons étudié l'article "Explaining and Harnessing Adversarial Examples" qui traite des fameuses adversarial attacks.
-Cet article propose une approche afin d'expliquer l'origine de l'effet de ces attaques et tente par la suite de prouver cette thèse par un ensemble d'expériences mettant en lumière l'application d'attaques adversarial sur différents types de modèles de clasiffication d'image en se basant sur le dataset MNIST.
+Step 1 : entraîner un modèle de classification Maxout network avec 240 et 1600 unit sur le dataset MNIST en utilisant une loss normale :
+Pour le 240 unit : 
+Epoch 68/100.. Train loss: 0.478.. Validation loss: 0.323.. Train accuracy: 86.515.. Validation accuracy: 90.750
+Pour le 1600 unit :
+Epoch 100/100.. Train loss: 1.014.. Validation loss: 0.696.. Train accuracy: 67.597.. Validation accuracy: 78.910
+
+Moins bon résultats pour le 1600 unit que le 240 unit. Comme je n'ai pas forcément le même réseau, je ne peux pas correctment comparer les résultats avec ceux de l'article.
 
 
-## Répartition des tâches
+Step 2: entraîner le même modèle de classification avec loss adversarial:$\tilde{J}(\theta, x, y) = \alpha J(\theta, x, y) + (1 - \alpha) J(\theta, x + \epsilon \cdot \text{sign}(\nabla_x J(\theta, x, y)))$
+et comparer les errors rates
+param : entraînement sur 100 epochs, batch size 64, learning rate 0.001, $\alpha = 0.5$, $\epsilon = 0.1$.
+Pour le 240 unit :
+Epoch 100/100.. Train loss: 2.394.. Train accuracy: 86.685.. Validation loss: 2.484.. Validation accuracy: 90.680 //validation accuracy constante tout le long de l'entraînement ( à investiguer)
+Pour le 1600 unit :
+Epoch 100/100.. Train loss: 1.144.. Train accuracy: 70.547.. Validation loss: 0.907.. Validation accuracy: 82.300
 
-* 1 - Fast gradient sign method : Tout le groupe
-* 2 - Modèle de régression logistique appliqué sur des exemples modifiés par adversarial attaques : Loris
-* 3 - Adversarial training = exemple contre classifieur et régularisation : Florent
-* 4 - RBF network vs adversarial : Quentin
-* 5 - Expliquer comment l'attaque adversarial se généralise à plusieurs modèles : AL
+meilleurs perf pour le 1600 unit avec une adversarial loss, max de perf obtenu à Epoch 25/100.. Train loss: 1.312.. Train accuracy: 67.780.. Validation loss: 0.952.. Validation accuracy: 86.940
+
+Step 3 : attaquer ce modèle avec la méthode FGSM et lui donner des images adversariales.
+
+Step 4
