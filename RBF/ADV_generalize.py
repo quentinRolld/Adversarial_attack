@@ -11,6 +11,13 @@ import json
 import torchvision.datasets as dsets
 import torch.utils.data as Data
 
+import matplotlib.pyplot as plt
+from sklearn.datasets import fetch_openml
+from torch.utils.data import DataLoader, TensorDataset
+from sklearn.model_selection import train_test_split
+from matplotlib.colors import LinearSegmentedColormap
+from sklearn.preprocessing import LabelEncoder
+
 
 """ Here is the function that will compute the adversarial examples
 arguments :
@@ -91,3 +98,74 @@ def test_Maxout( model_Maxout, device, normal_loader, epsilon):
 
     # Return the accuracy and the arg of the softmax
     return final_acc, output_arg_softmax
+
+
+
+def training_loop_Maxout(optimizer, model, criterion, X_train_tensor, y_train_tensor, num_epochs=200, batch_size=128):
+    train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+    train_loader = DataLoader(train_dataset, batch_size, shuffle=True)
+
+    train_losses = []  # Store training losses for each epoch
+
+    for epoch in range(num_epochs):
+        for batch_X, batch_y in train_loader:
+            outputs, _ = model(batch_X)
+            loss = criterion(outputs, batch_y)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        train_losses.append(loss.item())  # Store the loss after each epoch
+        print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}')
+
+    return train_losses,model
+
+def eval_test_Maxout(X_test_tensor,y_test_tensor,model):
+    # Convert test data to DataLoader for batching
+    test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
+    test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
+
+    model.eval()  # Set the model to evaluation mode
+    total = 0
+    correct = 0
+    total_mean_confidence = 0.0
+    total_samples = 0
+
+    incorrect_mean_confidence = 0.0
+    incorrect_samples = 0
+
+    args_x = []
+
+    with torch.no_grad():
+        for batch_X, batch_y in test_loader:
+            outputs, arg_x = model(batch_X)
+            args_x.append(arg_x)
+            _, predicted = torch.max(outputs.data, 1)
+            total += batch_y.size(0)
+            correct += (predicted == batch_y).sum().item()
+
+            # Calculate mean confidence for all predictions
+            probabilities = nn.functional.softmax(outputs, dim=1)
+            confidences, _ = torch.max(probabilities, dim=1)
+            total_mean_confidence += confidences.sum().item()
+            total_samples += batch_y.size(0)
+
+            # Calculate mean confidence for incorrect predictions
+            incorrect_mask = predicted != batch_y
+            if incorrect_mask.sum().item() > 0:
+                incorrect_mean_confidence += confidences[incorrect_mask].sum().item()
+                incorrect_samples += incorrect_mask.sum().item()
+
+    # Calculate mean confidence for all examples
+    if total_samples > 0:
+        total_mean_confidence /= total_samples
+
+    # Calculate mean confidence for incorrect predictions
+    if incorrect_samples > 0:
+        incorrect_mean_confidence /= incorrect_samples
+
+    accuracy = correct / total
+    print(f'Accuracy: {accuracy * 100:.2f}%')
+    print(f'Mean Confidence for All Examples: {total_mean_confidence:.4f}')
+    print(f'Mean Confidence for Incorrect Predictions: {incorrect_mean_confidence:.4f}')
