@@ -37,9 +37,9 @@ class ShallowRBF(nn.Module):
 
 # Version 2:
 
-class RbfNet(nn.Module):
+class RbfNet2(nn.Module):
     def __init__(self, centers, num_class=10):
-        super(RbfNet, self).__init__()
+        super(RbfNet2, self).__init__()
         self.centers = centers
         self.num_centers = centers.size(0)
         self.num_class = num_class
@@ -48,13 +48,17 @@ class RbfNet(nn.Module):
         self.beta = nn.Parameter(torch.ones(1,self.num_centers)/10)
 
     def radial_fun(self, batches):
-        n_input = batches.size(0) # number of inputs
-        A = self.centers.view(self.num_centers,-1).repeat(n_input,1,1)
-        B = batches.view(n_input,-1).unsqueeze(1).repeat(1,self.num_centers,1)
-        C = torch.exp(-self.beta.mul((A-B).pow(2).sum(2,keepdim=False).sqrt() ) )
-        return C
+        n_input = batches.size(0)
+        x = self.centers.view(self.num_centers,-1).repeat(n_input,1,1)
+        center = batches.view(n_input,-1).unsqueeze(1).repeat(1,self.num_centers,1)
+        # Here we use the radial basis function, with the norm being the euclidian distance and 
+        # the function being the gaussian function
+        # h(x) = exp(-beta*||x-c||^2)
+        hx = torch.exp(-self.beta.mul((x-center).pow(2).sum(2,keepdim=False).sqrt() ) )
+        return hx
     
     def forward(self, batches):
         radial_val = self.radial_fun(batches)
         class_score = self.linear(radial_val)
         return class_score
+    
