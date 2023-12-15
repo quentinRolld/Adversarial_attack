@@ -35,7 +35,7 @@ def adv_attack(model, device, image, epsilon, labels):
     image = image.to(device) # Move to CPU
     labels = labels.to(device) 
     image.requires_grad = True
-    sorties = model(image)
+    sorties, _ = model(image)
 
     model.zero_grad() # zero all the gradients
     cost = loss(sorties, labels).to(device) # compute the loss
@@ -80,6 +80,8 @@ def test_Maxout( model_Maxout, device, normal_loader, epsilon):
 
         # Re-classify the perturbed image using the new images wihch are now altered
         output, output_arg_softmax = model_Maxout(altered_data)
+        print("arg softmax :", output_arg_softmax)
+        print("output :", output.shape)
 
         # Check for success
         final_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability --> argmax
@@ -88,16 +90,15 @@ def test_Maxout( model_Maxout, device, normal_loader, epsilon):
         correct = (final_pred == labels).sum().item()
 
         probabilities = nn.functional.softmax(output, dim=1)
-        confidence, predictions = torch.max(probabilities, dim=1) # est-ce que c'est bien le max qu'il faut prendre ?
-                                                                  # le max de la sortie de la fonction softmax ?
+        confidence, predictions = torch.max(probabilities, dim=1) # le max de la sortie de la fonction softmax
                                                                   # pour trouver la confiance et la prediction
-
+                                                                
     # Calculate final accuracy for this epsilon
     final_acc = correct/float(len(normal_loader))
     print(f"Epsilon: {epsilon}\tTest Accuracy = {correct} / {len(normal_loader)} = {final_acc}")
 
     # Return the accuracy and the arg of the softmax
-    return final_acc, output_arg_softmax
+    return final_acc, output
 
 
 
