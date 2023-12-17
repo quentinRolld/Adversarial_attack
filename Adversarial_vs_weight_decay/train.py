@@ -23,44 +23,55 @@ def prep_data(filtered_data):
 
     filtered_data_normalized = filtered_data.iloc[:, :-1].values / 255.0
 
-
     # Convert data to PyTorch tensors
     X_tensor = torch.tensor(filtered_data_normalized, dtype=torch.float32)
     y_tensor = torch.tensor(y_train_encoded, dtype=torch.long)
 
-    # Split the data into training and testing sets
-    X_train_tensor, X_test_tensor, y_train_tensor, y_test_tensor = train_test_split(X_tensor, y_tensor, test_size=0.2, random_state=42)
+    # Split the data into training, validation, and testing sets
+    X_train, X_temp, y_train, y_temp = train_test_split(X_tensor, y_tensor, test_size=0.2, random_state=42)
+    X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42)
+
     num_classes = len(set(y))
     print("Unique classes in target labels:", num_classes)
-    return X_train_tensor,y_train_tensor,X_test_tensor,y_test_tensor,num_classes
+    return X_train,y_train,X_val,y_val,X_test,y_test,num_classes
 
 
-def create_model(X_train_tensor,num_classes,lr):
+def create_model(X_train,num_classes,lr):
+    import torch.nn.functional as F
     class LogisticRegressionModel(nn.Module):
         def __init__(self, input_size, num_classes):
             super(LogisticRegressionModel, self).__init__()
             self.linear = nn.Linear(input_size, num_classes)
 
         def forward(self, x):
-            return self.linear(x)
+            # Apply softplus activation function
+            return F.softplus(self.linear(x), beta=1, threshold=20)
+
     # Specify input size and dynamically set the number of classes
-    input_size = X_train_tensor.shape[1]
+    input_size = X_train.shape[1]
 
     # Instantiate the model
     model = LogisticRegressionModel(input_size, num_classes)
 
     # Define loss function and optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr)
+    optimizer = optim.SGD(model.parameters(),lr , momentum=0.9, nesterov=True)
     return model,criterion,optimizer
 
-def training_loop(optimizer, model, criterion, X_train_tensor, y_train_tensor, num_epochs=200, batch_size=128):
-    train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+def training_loop(optimizer, model, criterion, X_train, y_train,X_val, y_val, num_epoch, batch_size):
+    train_dataset = TensorDataset(X_train, y_train)
     train_loader = DataLoader(train_dataset, batch_size, shuffle=True)
 
-    train_losses = []  # Store training losses for each epoch
+    # Validation data
+    val_dataset = TensorDataset(X_val, y_val)
+    val_loader = DataLoader(val_dataset, batch_size, shuffle=False)
 
-    for epoch in range(num_epochs):
+    # Training loop with validation
+    train_losses = []  # Store training losses for each epoch
+    val_losses = []    # Store validation losses for each epoch
+    num_epoch = 120
+
+    for epoch in range(num_epoch):
         for batch_X, batch_y in train_loader:
             outputs = model(batch_X)
             loss = criterion(outputs, batch_y)
@@ -70,17 +81,26 @@ def training_loop(optimizer, model, criterion, X_train_tensor, y_train_tensor, n
             optimizer.step()
 
         train_losses.append(loss.item())  # Store the loss after each epoch
-        print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}')
+        with torch.no_grad():
+            model.eval()
+            val_loss = 0.0
+            for val_batch_X, val_batch_y in val_loader:
+                val_outputs = model(val_batch_X)
+                val_loss += criterion(val_outputs, val_batch_y).item()
 
+            val_loss /= len(val_loader)
+            val_losses.append(val_loss)
+            print(f'Epoch [{epoch + 1}/{num_epoch}], Training Loss: {loss.item():.4f}, Validation Loss: {val_loss:.4f}')
     return train_losses,model
 
 
 def plot_losses(train_losses):
     import matplotlib.pyplot as plt
     plt.plot(train_losses, label='Training Loss')
+    plt.plot(val_losses, label='Validation Loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.title('Training Curve')
+    plt.title('Training and Validation Curves')
     plt.legend()
     plt.show()
 
@@ -138,10 +158,14 @@ def eval_test(X_test_tensor,y_test_tensor,model):
     test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
     test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
-    # Evaluation loop
-    model.eval()
-    correct = 0
+    model.eval()  # Set the model to evaluation mode
     total = 0
+    correct = 0
+    total_mean_confidence = 0.0
+    total_samples = 0
+
+    incorrect_mean_confidence = 0.0
+    incorrect_samples = 0
 
     with torch.no_grad():
         for batch_X, batch_y in test_loader:
@@ -150,5 +174,27 @@ def eval_test(X_test_tensor,y_test_tensor,model):
             total += batch_y.size(0)
             correct += (predicted == batch_y).sum().item()
 
+            # Calculate mean confidence for all predictions
+            probabilities = nn.functional.softmax(outputs, dim=1)
+            confidences, _ = torch.max(probabilities, dim=1)
+            total_mean_confidence += confidences.sum().item()
+            total_samples += batch_y.size(0)
+
+            # Calculate mean confidence for incorrect predictions
+            incorrect_mask = predicted != batch_y
+            if incorrect_mask.sum().item() > 0:
+                incorrect_mean_confidence += confidences[incorrect_mask].sum().item()
+                incorrect_samples += incorrect_mask.sum().item()
+
+    # Calculate mean confidence for all examples
+    if total_samples > 0:
+        total_mean_confidence /= total_samples
+
+    # Calculate mean confidence for incorrect predictions
+    if incorrect_samples > 0:
+        incorrect_mean_confidence /= incorrect_samples
+
     accuracy = correct / total
-    print(f'Test Accuracy: {accuracy * 100:.2f}%')
+    print(f'Accuracy: {accuracy * 100:.2f}%')
+    print(f'Mean Confidence for All Examples: {total_mean_confidence:.4f}')
+    print(f'Mean Confidence for Incorrect Predictions: {incorrect_mean_confidence:.4f}')
