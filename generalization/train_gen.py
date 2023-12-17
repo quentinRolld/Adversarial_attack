@@ -10,49 +10,131 @@ from sklearn.model_selection import train_test_split
 from matplotlib.colors import LinearSegmentedColormap
 from sklearn.preprocessing import LabelEncoder
 
-def prep_data(filtered_data):
-
-    label_mapping = {3: 0, 7: 1}
+def prep_data(data):
 
     # Assuming y is your target labels
-    y = filtered_data['target'].values
-    y_train_mapped = [label_mapping[label] for label in y]
-    label_encoder = LabelEncoder()
-    label_encoder.classes_ = np.array([3, 7])
-    y_train_encoded = label_encoder.transform(y)
+    y = data['target'].values
 
-    filtered_data_normalized = filtered_data.iloc[:, :-1].values / 255.0
-
+    # Normalize the data
+    data_normalized = data.iloc[:, :-1].values / 255.0
 
     # Convert data to PyTorch tensors
-    X_tensor = torch.tensor(filtered_data_normalized, dtype=torch.float32)
-    y_tensor = torch.tensor(y_train_encoded, dtype=torch.long)
+    X_tensor = torch.tensor(data_normalized, dtype=torch.float32)
+    y_tensor = torch.tensor(y, dtype=torch.long)
 
     # Split the data into training and testing sets
     X_train_tensor, X_test_tensor, y_train_tensor, y_test_tensor = train_test_split(X_tensor, y_tensor, test_size=0.2, random_state=42)
     num_classes = len(set(y))
     print("Unique classes in target labels:", num_classes)
+
+
     return X_train_tensor,y_train_tensor,X_test_tensor,y_test_tensor,num_classes
 
 
-def create_model(X_train_tensor,num_classes,lr):
-    class LogisticRegressionModel(nn.Module):
-        def __init__(self, input_size, num_classes):
-            super(LogisticRegressionModel, self).__init__()
-            self.linear = nn.Linear(input_size, num_classes)
 
-        def forward(self, x):
-            return self.linear(x)
-    # Specify input size and dynamically set the number of classes
-    input_size = X_train_tensor.shape[1]
+def create_model(MaxoutNetworkWithSoftmax):
+    input_size = 784
+    num_classes = 10
+    device = torch.device("cpu")
 
-    # Instantiate the model
-    model = LogisticRegressionModel(input_size, num_classes)
+    # Define the model
+    model = MaxoutNetworkWithSoftmax(input_size, num_classes)
 
-    # Define loss function and optimizer
+    model = model.to(device)
+
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+    # Define the loss function
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr)
     return model,criterion,optimizer
+
+def create_model_2(DeepMaxoutNetwork,X_train_tensor):
+
+        # Hyperparameters
+    num_epochs = 100
+    Batch_size =  100
+    # Create an instance of the DeepMaxoutNetwork
+    deep_maxout_model = DeepMaxoutNetwork(input_dim=784, hidden_dim=100, output_dim=10, num_units=2, num_layers=3)
+    input_size = X_train_tensor.shape[1]
+    criterion = nn.CrossEntropyLoss()
+    sgd =  optim.SGD(deep_maxout_model.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)
+    adam = optim.Adam(deep_maxout_model.parameters(), lr=0.01,weight_decay=1e-2) 
+    optimizer = adam
+
+    return deep_maxout_model,criterion,optimizer, num_epochs, Batch_size
+ 
+def create_model_3(ShallowRBF,X_train_tensor,centers):
+    # Hyperparameters
+    num_epochs = 100
+    learning_rate = 0.01
+    momentum = 0.9
+    Batch_size =  100
+    num_classes = 10
+    input_size = 784
+    n_channels = 3
+    num_units = 2
+    # Create an instance of the DeepMaxoutNetwork
+    RBF_model = ShallowRBF(input_dim=784, num_classes=10, num_centers=centers.shape[0])
+    input_size = X_train_tensor.shape[1]
+    criterion = nn.CrossEntropyLoss()
+    sgd =  optim.SGD(RBF_model.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)
+    adam = optim.Adam(RBF_model.parameters(), lr=0.01) 
+    optimizer = adam
+
+    return RBF_model,criterion,optimizer, num_epochs, Batch_size
+
+def create_model_4(ShallowSoftmaxNetBN,X_train_tensor):
+    # Hyperparameters
+    num_epochs = 100
+    learning_rate = 0.01
+    momentum = 0.9
+    Batch_size = 100
+    num_classes = 10
+    input_size = 784
+    n_channels = 3
+    num_units = 2
+    # Create an instance of the DeepMaxoutNetwork
+    ShallowSoftmax_model = ShallowSoftmaxNetBN(input_dim=784, output_dim=10)
+
+    input_size = X_train_tensor.shape[1]
+    criterion = nn.CrossEntropyLoss()
+    sgd =  optim.SGD(ShallowSoftmax_model.parameters(), lr=0.01,weight_decay=1e-2)
+    adam = optim.Adam(ShallowSoftmax_model.parameters(), lr=0.01,weight_decay=1e-4)
+    optimizer = adam
+    return ShallowSoftmax_model,criterion,optimizer, num_epochs, Batch_size
+
+
+
+
+def test_eps(test_Maxout,model,device,test_dataloader):
+    # Run test for each epsilon
+
+    accuracies = []
+    args = []
+    epsilons = [-15,-14,-13,-12,-11, -10,-9,-8,-7,-6, -5,-4,-3,-2,-1, 0,1,2,3,4, 5,6,7,8,9, 10,11,12,13,14, 15]
+
+    for eps in epsilons:
+        accuracy, arg = test_Maxout(model, device, test_dataloader, eps)
+        accuracies.append(accuracy)
+        args.append(arg)
+    return args, epsilons
+
+def plot_eps(args,epsilons):
+    for i in range(len(args)):
+        args[i] = args[i].detach().numpy()
+        args[i] = np.log(args[i]) - np.log(np.sum(np.exp(args[i]), axis=1, keepdims=True))
+        args[i] = args[i].mean(axis=0)
+    # Plot the average values as a function of epsilon
+    #plt.figure(figsize=(6, 18))  # Increase the height by a factor of 3
+    plt.plot(epsilons, [i[:] for i in args])
+    plt.xlabel('Epsilon')
+    plt.ylabel('softmax output')
+
+    plt.title('softmax output for each class vs Epsilon')
+    plt.legend(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
+    plt.show()
+
+
 
 def training_loop(optimizer, model, criterion, X_train_tensor, y_train_tensor, num_epochs=200, batch_size=128):
     train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
