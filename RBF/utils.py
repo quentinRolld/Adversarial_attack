@@ -19,20 +19,19 @@ def extract_from_mnist():
     # Convert labels to integers
     mnist.target = mnist.target.astype(int)
 
-    # Filter the dataset for digits 7 and 3
-    digits = [7, 3]
-    filter_mask = mnist.target.isin(digits)
-    filtered_data = pd.DataFrame(data=mnist.data[filter_mask], columns=mnist.feature_names)
-    filtered_data['target'] = mnist.target[filter_mask]
+    data = pd.DataFrame(data=mnist.data, columns=mnist.feature_names)
+    data['target'] = mnist.target
+
+    data = data.sample(n=20000, random_state=42)
 
     # Reset the index of the filtered dataset
-    filtered_data = filtered_data.reset_index(drop=True)
+    data = data.reset_index(drop=True)
 
     # Print the shape of the filtered dataset
-    print("Filtered dataset shape:", filtered_data.shape)
-    print("Labels:", filtered_data['target'])
+    print("Filtered dataset shape:", data.shape)
+    print("Labels:", data['target'])
 
-    return filtered_data
+    return data
 
 def visualize_data(num_rows,num_cols,filtered_data):
 

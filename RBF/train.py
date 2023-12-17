@@ -10,28 +10,24 @@ from sklearn.model_selection import train_test_split
 from matplotlib.colors import LinearSegmentedColormap
 from sklearn.preprocessing import LabelEncoder
 
-def prep_data(filtered_data):
-
-    label_mapping = {3: 0, 7: 1}
+def prep_data(data):
 
     # Assuming y is your target labels
-    y = filtered_data['target'].values
-    y_train_mapped = [label_mapping[label] for label in y]
-    label_encoder = LabelEncoder()
-    label_encoder.classes_ = np.array([3, 7])
-    y_train_encoded = label_encoder.transform(y)
+    y = data['target'].values
 
-    filtered_data_normalized = filtered_data.iloc[:, :-1].values / 255.0
-
+    # Normalize the data
+    data_normalized = data.iloc[:, :-1].values / 255.0
 
     # Convert data to PyTorch tensors
-    X_tensor = torch.tensor(filtered_data_normalized, dtype=torch.float32)
-    y_tensor = torch.tensor(y_train_encoded, dtype=torch.long)
+    X_tensor = torch.tensor(data_normalized, dtype=torch.float32)
+    y_tensor = torch.tensor(y, dtype=torch.long)
 
     # Split the data into training and testing sets
     X_train_tensor, X_test_tensor, y_train_tensor, y_test_tensor = train_test_split(X_tensor, y_tensor, test_size=0.2, random_state=42)
     num_classes = len(set(y))
     print("Unique classes in target labels:", num_classes)
+
+
     return X_train_tensor,y_train_tensor,X_test_tensor,y_test_tensor,num_classes
 
 
